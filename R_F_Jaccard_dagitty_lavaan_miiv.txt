@@ -1,0 +1,190 @@
+~~~~~~~~~~~~nonrecursive too?????????????~~~~~~~~~~~~~~~~~~~~~~~
+library("dagitty")
+library("MIIVsem")
+library("lavaan")
+install.packages("hms")
+library("hms")
+install.packages("semTools")
+library("semTools")
+install.packages("haven")
+library(haven)
+
+
+setwd("C:/data")
+getwd()
+## C=cause; E=effect; X=distal cause; M=mediator; Y=final effect
+
+#data nly needed for estimation: dagitty and MIIVsem can work without
+dpp36 <- read_dta("D:/docs/stats_R/dpp_36males_Hartford_fewer.dta")
+View(dpp36)
+
+table(dpp36$married)
+t.test(dpp36$BMICa0~dpp36$married) # where y is numeric and x is a binary factor
+
+## save(dpp36, file = "dpp36.RData")
+#load("C:/data/dpp36.RData")
+View(dpp36)
+
+table(dpp36$married)
+t.test(dpp36$BMICa0~dpp36$married) # where y is numeric and x is a binary factor
+
+##################### mediation model ~~~~~~~~~
+
+install.packages("mediation")
+library("mediation")
+
+model <- 'model <- indir1 '
+a1c0 ~ a*BMICa0 + c*income
+a1c0 ~ b*BMICa0
+ind := b*c
+'
+
+fit <- sem(indir1, data = dpp_36males_Hartford_fewer)
+summary(fit, standardized = TRUE, rsq = T)
+
+fit <- sem(indir1, 
+data = dpp36,
+group = "married")
+
+
+################### Appendix d: contC [BMICa0] ->contE [fg0] ########
+
+##0 MIIVsem
+model.MiivJaccApp_d <- '
+ fg0 ~ BMICa0 
+ '
+
+miivs(model.MiivJaccApp_a0)
+Model Equation Information 
+
+# 2 DAG
+DagJaccApp_d<- dagitty('dag {
+BMICa0[pos="1,2"] 
+fg0 [pos="2,2"] 
+BMICa0  -> fg0 
+}')
+
+plot (DagJaccApp_d)
+
+# 3 Lavaan
+# regression 
+SEMJaccApp_d  <- '
+fg0 ~ BMICa0 
+'
+
+fit <- sem(SEMJaccApp_d, data = dpp36)
+summary(fit, rsq = T)
+
+fit <- sem(SEMJaccApp_d, 
+data = dpp36,
+group = "married")
+
+summary(fit, standardized = TRUE, rsq = T)
+
+# needs semTools
+# measurementInvariance(SEMJaccApp_d, data=dpp36, group="married")
+
+summary(fit, standardized = TRUE, rsq = T)
+
+# convert lavaan model to dagitty syntax
+#g <- lavaanToGraph( lavaanify( path.model ) )
+#plot( graphLayout(g) )
+
+################### Appendix a: binaryC->contE ############################################
+
+# vs. t-test https://www.statmethods.net/stats/ttest.html
+# independent 2-group t-test
+table(dpp36$married)
+t.test(dpp36males_Hartford_fewer$BMICa0~dpp36$married) # where y is numeric and x is a binary factor
+
+t.test(dpp36$BMICa0~dpp36$married,var.equal=TRUE) 
+
+##1 MIIVsem
+model.MiivJaccApp_a <- '
+ BMICa0  ~ married
+ '
+
+# 2 DAG
+DagJaccApp_a <- dagitty('dag {
+married[pos="1,2"] 
+BMICa0 [pos="2,2"] 
+married -> BMICa0  
+}')
+
+plot (DagJaccApp_a)
+
+# 3 Lavaan 
+# regressbinary 
+SEMJaccApp_a <- 
+'
+BMICa0 ~ married
+'
+# ONLY at this stage we need DATA!!!
+fit <- sem(SEMJaccApp_a, data = dpp36)
+summary(fit, standardized = TRUE, rsq = T)
+
+# 2 group 1 Effect no predictor model; Onyx is another option Robin Beaumont_sem_equivalents_basic_stats
+# http://www.floppybunny.org/robin/web/rbook/sem/sem_equivalents_basic_stats.pdf
+SEMJaccApp_a2 <- 
+'
+BMICa0~1
+'
+
+# The 2-grouping is in the FIT stage! ONLY at this stage we need DATA!!!
+fit <- sem(SEMJaccApp_a2, data = dpp36)
+
+fit <- sem(SEMJaccApp_a2, 
+data = dpp_36males_Hartford_fewer,
+group = "married")
+
+#####means variances different
+SEMJaccApp_a2 <-  '
+BMICa0~1
+'
+fitdif <- sem(SEMJaccApp_a2, data = dpp36)
+
+#####imposed equality of means
+
+SEMJaccApp_aeq <-  '
+BMICa0~1
+'
+fiteq <- sem(SEMJaccApp_a2, 
+data = dpp36,
+group = "married",
+group.equal = c("intercepts"))
+
+summary(fiteq) 
+
+cbind(diffmeans=inspect(fitdif , 'fit.measures'), EQmeans=inspect(fiteq , 'fit.measures'))
+anova(fitdif,fiteq )
+
+summary(fit, standardized = TRUE, rsq = T)
+
+
+# needs semTools
+measurementInvariance(SEMJaccApp_a2.model, data=dpp36, group="married")
+Error in measurementInvariance(SEMJaccApp_a2.model, data = dpp36, group = "married") : 
+  all lavaan() and lavOptions() arguments must named, including the "model=" argument.
+In addition: Warning message:
+The measurementInvariance function is deprecated, and it will cease to be included in future versions of semTools. See help('semTools-deprecated) for details.
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 2 outcomes model nonrecursive
+
+
+##0.1 IV
+> model.eduincnonrec1 <- '
++ educ ~ income  + health
++ income ~ educ  + female
++ '
+
+
+> miivs(model.eduincnonrec1)
+Model Equation Information 
+
+ LHS    RHS            MIIVs         
+ educ   health, income health, female
+ income female, educ   health, female
+
+
+
